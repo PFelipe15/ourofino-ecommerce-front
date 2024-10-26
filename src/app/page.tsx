@@ -25,7 +25,7 @@ export default function Home() {
             {
               icon: <FaShippingFast className="text-primary text-3xl mx-auto mb-2" />,
               title: "ENTREGA RÁPIDA E EXCLUSIVA",
-              description: "Sua aliança em até 5 dias",
+              description: "Sua aliança em até 10 dias",
             },
             {
               icon: <FaCreditCard className="text-primary text-3xl mx-auto mb-2" />,
