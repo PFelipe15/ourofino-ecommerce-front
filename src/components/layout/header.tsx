@@ -579,7 +579,6 @@ const getUserAddress = async () => {
       {/* Promo Bar */}
       {!isScrolled && (
         <motion.div
-          initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8 }}
           className="bg-primary text-center font-bold py-3 hidden md:block text-white text-sm"

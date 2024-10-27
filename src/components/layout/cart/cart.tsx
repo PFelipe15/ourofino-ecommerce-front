@@ -25,6 +25,8 @@ import { MetodosPagamento } from '../../../../types/metodos_pagamento'
  import qs from 'qs'
 import { getProductsByFilter } from '@/_actions/Products'
 import { ProductsData } from '../../../../types/product-all-strape'
+import toast from 'react-hot-toast';
+
 interface CartProps {
   isOpen: boolean
   onClose: () => void
@@ -43,7 +45,6 @@ export const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
     country: 'BR'
   })
   const { user, isSignedIn } = useUser()
-   const { toast } = useToast()
   const [orderConfirmed, setOrderConfirmed] = useState(false)
   const [showOpenOrders, setShowOpenOrders] = useState(false)
   const [hasNewOrders, setHasNewOrders] = useState(true)
@@ -111,14 +112,10 @@ export const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
     const fetchPaymentMethods = async () => {
       try {
         const methods = await getPaymentMethods()
-         setPaymentMethods(methods)
+        setPaymentMethods(methods)
       } catch (error) {
         console.error('Erro ao buscar métodos de pagamento:', error)
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar os métodos de pagamento.',
-          variant: 'destructive'
-        })
+        toast.error('Não foi possível carregar os métodos de pagamento.')
       }
     }
 
@@ -166,60 +163,84 @@ useEffect(() => {
 
   const handleConfirmPurchase = async () => {
     if (!isSignedIn) {
-      toast({
-        title: "Ação não permitida",
-        description: "Por favor, faça login para finalizar sua compra.",
-        variant: "default",
-        action: <SignInButton mode='modal' >
-               <Button 
-                  variant="outline" 
-                  className="flex items-center gap-2 border-2 border-white text-primary hover:bg-primary hover:text-white transition-all hover:scale-105 px-4 py-2 rounded-md font-semibold"
-                >
-                  <User size={20} /> Entrar
+      toast.error(
+        (t) => (
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-medium text-gray-900">Ação não permitida</span>
+            <p className="mt-1 text-sm text-gray-500">Por favor, faça login para finalizar sua compra.</p>
+            <SignInButton mode='modal'>
+              <Button 
+                variant="outline" 
+                className="mt-3 flex items-center gap-2 bg-primary text-white hover:bg-primary-dark transition-all duration-300 px-4 py-2 rounded-md font-semibold text-sm"
+                onClick={() => toast.dismiss(t.id)}
+              >
+                <User size={16} /> Entrar
               </Button>
-        </SignInButton>
-      })
-      return
+            </SignInButton>
+          </div>
+        ),
+        {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#333',
+            padding: '16px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          },
+          icon: '🔒',
+        }
+      );
+      return;
     }
 
-    setIsProcessingPurchase(true)
-    try {
-      // 1. Serializa os dados do usuário
-      const serializedUser = createSerializedUser()
+    const purchasePromise = new Promise(async (resolve, reject) => {
+      setIsProcessingPurchase(true);
+      try {
+        const serializedUser = createSerializedUser();
+        const customer = await getCustomerOrCreate(serializedUser);
+        const { id, sandbox_init_point } = await processPayment();
+        const orderData = createOrderData(customer.id, sandbox_init_point, id);
+        await createOrderAndItems(orderData);
 
-      // 2. Cria ou obtém o cliente
-      const customer = await getCustomerOrCreate(serializedUser)
+        setShowThankYouMessage(true);
+        clearCart();
+        setPurchaseCompleted(true);
 
-      // 3. Processa o pagamento e obtém os dados necessários
-      const { id, sandbox_init_point } = await processPayment()
+        setTimeout(() => {
+          window.open(orderData.link_payment, '_blank');
+        }, 2000);
 
-      // 4. Cria os dados do pedido
-      const orderData = createOrderData(customer.id, sandbox_init_point, id)
-      // 5. Cria o pedido e os itens
-      await createOrderAndItems(orderData)
+        resolve(orderData);
+      } catch (error) {
+        reject(error);
+      } finally {
+        setIsProcessingPurchase(false);
+      }
+    });
 
-      // 6. Exibe mensagem de sucesso e limpa o carrinho
-      toast({
-        title: 'Pedido confirmado com sucesso',
-        description: 'Você será redirecionado automaticamente para o pagamento',
-        variant: 'success'
-      })
-      setShowThankYouMessage(true)
-      clearCart()
-
-      setPurchaseCompleted(true)
-
-      // 7. Redireciona para a página de pagamento após um breve atraso
-      setTimeout(() => {
-        window.open(orderData.link_payment, '_blank')
-      }, 2000)
-
-    } catch (error) {
-      handleError(error)
-    } finally {
-      setIsProcessingPurchase(false)
-    }
-  }
+    toast.promise(
+      purchasePromise,
+      {
+        loading: 'Processando sua compra...',
+        success: 'Pedido confirmado com sucesso! Redirecionando para o pagamento...',
+        error: 'Erro ao processar o pagamento. Por favor, tente novamente.',
+      },
+      {
+        style: {
+          minWidth: '250px',
+        },
+        success: {
+          duration: 5000,
+          icon: '🎉',
+        },
+        error: {
+          duration: 5000,
+          icon: '❌',
+        },
+      }
+    );
+  };
 
   const createSerializedUser = () => ({
     data: {
@@ -235,11 +256,11 @@ useEffect(() => {
   const processPayment = async () => {
     try {
       if(items.length === 0) {
-       toast({
-        title: 'Erro',
-        description: 'Carrinho vazio',
-        variant: 'destructive'
-       })
+        toast.error('Carrinho vazio', {
+          duration: 3000,
+          position: 'top-center',
+          icon: '🛒',
+        });
       }
 
       const args = {
@@ -280,12 +301,15 @@ useEffect(() => {
   })
 
   const handleAddToCart = (product: ProductsData, quantity: number, price: number, selectedSize?: string) => {
-    
-     addItem(product, quantity, price, selectedSize);
-    toast({
-      title: "Produto adicionado",
-      description: `${product.attributes.name} foi adicionado ao seu carrinho.`,
-      variant: "default"
+    addItem(product, quantity, price, selectedSize);
+    toast.success(`${product.attributes.name} foi adicionado ao seu carrinho.`, {
+      duration: 3000,
+      icon: '🛍️',
+      style: {
+        borderRadius: '10px',
+        background: '#333',
+        color: '#fff',
+      },
     });
   };
 
@@ -294,22 +318,21 @@ useEffect(() => {
       const responseCreateOrder = await createOrder(orderData)
       await createItemsOrder(items, responseCreateOrder.data.id)
     } catch (error) {
-      toast({
-        title: 'Erro ao criar o pedido e seus items',
-        description: 'Por favor, verifique os dados e tente novamente.'
-      })
-      console.log(error)
+      toast.error('Erro ao criar o pedido e seus itens. Por favor, verifique os dados e tente novamente.', {
+        duration: 4000,
+        icon: '❌',
+        style: {
+          borderRadius: '10px',
+          background: '#FEE2E2',
+          color: '#991B1B',
+          border: '1px solid #F87171',
+        },
+      });
+      console.error('Erro ao criar o pedido:', error);
     }
   }
 
-  const handleError = (error: any) => {
-    console.error("Erro ao criar cliente:", error)
-    toast({
-      title: 'Erro ao processar o pagamento',
-      description: 'Por favor, verifique os dados e tente novamente.',
-      variant: 'destructive'
-    })
-  }
+  
   const containerVariants = {
     hidden: { opacity: 0, x: '100%' },
     visible: { opacity: 1, x: 0, transition: { type: 'spring', damping: 25, stiffness: 120 } },
@@ -601,6 +624,12 @@ useEffect(() => {
   )
 }
  
+
+
+
+
+
+
 
 
 
