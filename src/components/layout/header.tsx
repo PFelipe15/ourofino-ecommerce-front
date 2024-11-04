@@ -25,6 +25,7 @@ import { MdDiamond, MdGridGoldenratio } from "react-icons/md";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { Daum2 } from "../../../types/customers-strape";
+import { Attributes2 } from "../../../types/customers-strape";
  
    
 const Header = () => {
@@ -133,7 +134,7 @@ const Header = () => {
         // Atualizar endereço existente
         updatedAddresses[addressIndex] = {
           ...updatedAddresses[addressIndex],
-          attributes: addressData
+          attributes: addressData as Attributes2
         };
       } else {
         // Adicionar novo endereço
@@ -144,7 +145,7 @@ const Header = () => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             publishedAt: new Date().toISOString()
-          }
+          } as Attributes2
         });
       }
 
