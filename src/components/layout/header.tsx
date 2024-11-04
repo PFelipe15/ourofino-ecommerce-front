@@ -1,5 +1,5 @@
 'use client'
-import { ShoppingCart,  Search, Menu, Phone, Mail, HeadphonesIcon, ChevronDown, Diamond, BellRing, Shirt, DiamondIcon } from "lucide-react";
+import { ShoppingCart,  Search, Menu, Phone, Mail, HeadphonesIcon, ChevronDown, Diamond, BellRing, Shirt, DiamondIcon, PlusCircle, MapPin } from "lucide-react";
 import Image from "next/image";
 import { FaFacebook, FaInstagram, FaPinterest, FaRing } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,11 +19,12 @@ import { User, LogOut, Gift, Heart, Truck, Clock } from "lucide-react";
 import { SubmitAddress } from "@/_actions/submit-address";
 import toast from 'react-hot-toast';
 import { FiCheck, FiAlertTriangle, FiMapPin, FiShoppingBag } from 'react-icons/fi';
-import { getCustomerOrCreate } from "@/_actions/Customers";
+import { getCustomerOrCreate, updateCustomer } from "@/_actions/Customers";
 import { Category, getCategoriesAndCollections } from "@/_actions/Categories";
 import { MdDiamond, MdGridGoldenratio } from "react-icons/md";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
+import { Daum2 } from "../../../types/customers-strape";
  
    
 const Header = () => {
@@ -42,6 +43,17 @@ const Header = () => {
   const [isLoading, setIsLoading] = useState(false); // Adiciona estado para controle de loading
   const [categories, setCategories] = useState<Category[]>([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [addresses, setAddresses] = useState<Daum2[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<Daum2 | null>(null);
+  const [isNewAddress, setIsNewAddress] = useState(false);
+  const [newAddress, setNewAddress] = useState({
+    Nome: '',
+    Rua: '',
+    Cep: '',
+    Cidade: '',
+    Bairro: '',
+    Estado: '',
+  });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -78,6 +90,105 @@ const Header = () => {
 
   const cartItems = useCartStore((state) => state.items);
 
+  const handleNewAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (selectedAddress) {
+      // Se estiver editando um endereço existente
+      setSelectedAddress({
+        ...selectedAddress,
+        attributes: {
+          ...selectedAddress.attributes,
+          [name]: value
+        }
+      });
+    } else {
+      // Se estiver criando um novo endereço
+      setNewAddress(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  // Adicione esta função para salvar as alterações
+  const handleAddressSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id) {
+      toast.error('Por favor, faça login para salvar seu endereço.');
+      return;
+    }
+
+    try {
+      const addressData = selectedAddress ? selectedAddress.attributes : newAddress;
+      
+      // Encontre o índice do endereço sendo editado (se houver)
+      const addressIndex = selectedAddress 
+        ? addresses.findIndex(addr => addr.id === selectedAddress.id)
+        : -1;
+
+      // Crie uma cópia do array de endereços
+      let updatedAddresses = [...addresses];
+
+      if (addressIndex >= 0) {
+        // Atualizar endereço existente
+        updatedAddresses[addressIndex] = {
+          ...updatedAddresses[addressIndex],
+          attributes: addressData
+        };
+      } else {
+        // Adicionar novo endereço
+        updatedAddresses.push({
+          id: Math.max(...addresses.map(a => a.id), 0) + 1,
+          attributes: {
+            ...addressData,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            publishedAt: new Date().toISOString()
+          }
+        });
+      }
+
+      // Prepare os dados para atualização
+      const userData = {
+        data: {
+          first_name: user.firstName,
+          last_name: user.lastName,
+          email: user.emailAddresses[0]?.emailAddress,
+          phone: user.phoneNumbers[0]?.phoneNumber || 'Não informado',
+          enderecos: {
+            data: updatedAddresses
+          }
+        }
+      };
+ 
+      // Atualize o cliente no Strapi
+      await updateCustomer(String(user.id), userData);
+
+      toast.success(
+        selectedAddress ? 'Endereço atualizado com sucesso!' : 'Novo endereço adicionado com sucesso!'
+      );
+
+      // Limpe o formulário e atualize a lista
+      setSelectedAddress(null);
+      setIsNewAddress(false);
+      setNewAddress({
+        Nome: '',
+        Rua: '',
+        Cep: '',
+        Cidade: '',
+        Bairro: '',
+        Estado: '',
+      });
+
+      // Recarregue os endereços
+      getUserAddress();
+
+    } catch (error) {
+      console.error('Erro ao salvar endereço:', error);
+      toast.error('Erro ao salvar endereço. Tente novamente.');
+    }
+  };
+
 const getUserAddress = async () => {
   setIsLoading(true);  
   const userData = {
@@ -88,118 +199,30 @@ const getUserAddress = async () => {
       phone: user?.phoneNumbers[0]?.phoneNumber || 'Não informado',     
     }
   }
-  const customerResponse = await getCustomerOrCreate(userData);
-  const customerAddress = customerResponse.attributes?.address
-  
-  if (customerAddress) {
-    setAddress(customerAddress);
-  } else {
-    toast.error(
-      <div className="flex items-center">
-        <FiAlertTriangle className="text-yellow-500 mr-2" size={20} />
-        <div>
-          <p className="font-bold">Endereço não encontrado</p>
-          <p className="text-sm">Você ainda não cadastrou seu endereço.</p>
+  try {
+    const customerResponse = await getCustomerOrCreate(userData);
+    const customerAddresses = customerResponse.attributes?.enderecos?.data || [];
+     setAddresses(customerAddresses);
+    
+    if (customerAddresses.length === 0) {
+      toast.error(
+        <div className="flex items-center">
+          <FiAlertTriangle className="text-yellow-500 mr-2" size={20} />
+          <div>
+            <p className="font-bold">Nenhum endereço encontrado</p>
+            <p className="text-sm">Você ainda não cadastrou nenhum endereço.</p>
+          </div>
         </div>
-      </div>,
-      {
-        style: {
-          background: '#FFFBEB',
-          color: '#92400E',
-          padding: '16px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        },
-        duration: 4000,
-      }
-    );
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    toast.error('Erro ao carregar endereços');
   }
   setIsLoading(false);
 }
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setAddress(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddressSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!user?.id){
-      toast.error(
-        <div className="flex items-center">
-          <FiAlertTriangle className="text-red-500 mr-2" size={20} />
-          <div>
-            <p className="font-bold">Erro ao salvar endereço</p>
-            <p className="text-sm">Por favor, faça login para salvar seu endereço.</p>
-          </div>
-        </div>,
-        {
-          style: {
-            background: '#FEF2F2',
-            color: '#991B1B',
-            padding: '16px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          },
-          duration: 4000,
-        }
-      );
-      return;
-    }
-
-    const userData = {
-      email: user?.emailAddresses[0]?.emailAddress,
-      phone: user?.phoneNumbers[0]?.phoneNumber,
-      firstName: user?.firstName,
-      lastName: user?.lastName,
-      address: address
-    }
-    const successful = await SubmitAddress(userData);
-    if(successful){
-      toast(
-        <div className="flex items-center">
-          
-          <FiCheck className="text-green-500 mr-2" size={20} />
-          <div>
-            <p className="font-bold">Endereço salvo com sucesso</p>
-            <p className="text-sm">Seu novo endereço foi adicionado à sua conta.</p>
-          </div>
-        </div>,
-        {
-          style: {
-            background: 'hsl(var(--primary))',
-            color: 'hsl(var(--primary-foreground))',
-            padding: '16px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          },
-          duration: 4000,
-        }
-      
-      );
-      setIsAddressDialogOpen(false);
-    } else {
-      toast.error(
-        <div className="flex items-center">
-          <FiAlertTriangle className="text-red-500 mr-2" size={20} />
-          <div>
-            <p className="font-bold">Erro ao salvar endereço</p>
-            <p className="text-sm">Ocorreu um problema ao salvar seu endereço. Tente novamente.</p>
-          </div>
-        </div>,
-        {
-          style: {
-            background: '#FEF2F2',
-            color: '#991B1B',
-            padding: '16px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          },
-          duration: 4000,
-        }
-      );
-    }
-  };
+  
 
   const handleAddressDialogOpen = () => {
     setIsAddressDialogOpen(true);
@@ -599,105 +622,182 @@ const getUserAddress = async () => {
       
       {/* Dialog para endereço */}
       <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-yellow-50 to-yellow-100">
-          <DialogHeader className="flex flex-col items-center">
-            <Image
-              src="/logotipoourofino.svg"
-              alt="Ourofino Logo"
-              width={120}
-              height={60}
-              className="mb-4"
-            />
-            <DialogTitle className="text-2xl font-bold text-gray-800">
-              {address.street ? "Atualizar Endereço" : "Salvar Endereço"}
+        <DialogContent className="sm:max-w-[600px] bg-white">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="text-2xl font-semibold text-gray-900">
+              Meus Endereços
             </DialogTitle>
-            <DialogDescription className="text-center text-gray-600 mt-2">
-              {address.street ? "Atualize seu endereço de entrega" : "Cadastre seu endereço de entrega"}
+            <DialogDescription className="text-gray-600">
+              Gerencie seus endereços de entrega
             </DialogDescription>
           </DialogHeader>
+
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
               <span className="text-primary">Carregando...</span>
             </div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              transition={{ duration: 0.3 }}
-            >
-              <form onSubmit={handleAddressSubmit} className="mt-4 space-y-4">
-                {!address.street && (
-                  <div className="text-red-600 text-center">
-                    Você ainda não cadastrou seu endereço.
+            <div className="space-y-4 py-4">
+              {/* Lista de endereços */}
+              <div className="grid grid-cols-1 gap-4">
+                {addresses.map((address) => (
+                  <div
+                    key={address.id}
+                    className="p-4 rounded-lg border border-gray-100 hover:border-primary/20 transition-all bg-white shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-gray-900">
+                            {address.attributes.Nome}
+                          </h3>
+                          {/* Tag de endereço principal (opcional) */}
+                          {address.id === 1 && (
+                            <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full">
+                              Principal
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-600 text-sm">
+                          {address.attributes.Rua}
+                        </p>
+                        <p className="text-gray-600 text-sm">
+                          {address.attributes.Bairro}, {address.attributes.Cidade} - {address.attributes.Estado}
+                        </p>
+                        <p className="text-gray-500 text-sm">
+                          CEP: {address.attributes.Cep}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedAddress(address)}
+                        className="hover:bg-primary/10 text-primary"
+                      >
+                        <MapPin className="w-4 h-4 mr-2" />
+                        Editar
+                      </Button>
+                    </div>
                   </div>
-                )}
-                <motion.div className="space-y-4" initial="hidden" animate="visible" variants={{
-                  hidden: { opacity: 0 },
-                  visible: {
-                    opacity: 1,
-                    transition: {
-                      staggerChildren: 0.1
-                    }
-                  }
-                }}>
-                  <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }}>
-                    <Label htmlFor="street" className="text-sm font-medium text-gray-700">Rua</Label>
-                    <Input id="street" name="street" value={address.street} onChange={handleAddressChange} required className="mt-1" />
-                  </motion.div>
-                  <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }} className="flex space-x-4">
-                    <div className="flex-1">
-                      <Label htmlFor="number" className="text-sm font-medium text-gray-700">Número</Label>
-                      <Input id="number" name="number" value={address.number} onChange={handleAddressChange} required className="mt-1" />
-                    </div>
-                    <div className="flex-1">
-                      <Label htmlFor="complement" className="text-sm font-medium text-gray-700">Complemento</Label>
-                      <Input id="complement" name="complement" value={address.complement} onChange={handleAddressChange} className="mt-1" />
-                    </div>
-                  </motion.div>
-                  <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }}>
-                    <Label htmlFor="neighborhood" className="text-sm font-medium text-gray-700">Bairro</Label>
-                    <Input id="neighborhood" name="neighborhood" value={address.neighborhood} onChange={handleAddressChange} required className="mt-1" />
-                  </motion.div>
-                  <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }} className="flex space-x-4">
-                    <div className="flex-1">
-                      <Label htmlFor="city" className="text-sm font-medium text-gray-700">Cidade</Label>
-                      <Input id="city" name="city" value={address.city} onChange={handleAddressChange} required className="mt-1" />
-                    </div>
-                    <div className="flex-1">
-                      <Label htmlFor="state" className="text-sm font-medium text-gray-700">Estado</Label>
-                      <Input id="state" name="state" value={address.state} onChange={handleAddressChange} required className="mt-1" />
-                    </div>
-                  </motion.div>
-                  <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }}>
-                    <Label htmlFor="zipCode" className="text-sm font-medium text-gray-700">CEP</Label>
-                    <Input id="zipCode" name="zipCode" value={address.zipCode} onChange={handleAddressChange} required className="mt-1" />
-                  </motion.div>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="mt-6"
-                >
-                  <DialogFooter className="sm:justify-center space-x-4 mt-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAddressDialogOpen(false)}
-                      className="w-full sm:w-auto border-yellow-500 text-yellow-700 hover:bg-yellow-50"
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="w-full sm:w-auto bg-primary hover:bg-yellow-800 text-white"
-                    >
-                      {address.street ? "Atualizar Endereço" : "Salvar Endereço"}
-                    </Button>
-                  </DialogFooter>
-                </motion.div>
-              </form>
-            </motion.div>
+                ))}
+              </div>
+
+              {/* Botão adicionar novo endereço */}
+              <Button
+                onClick={() => setIsNewAddress(true)}
+                variant="outline"
+                className="w-full mt-4 border-dashed border-2 hover:border-primary hover:bg-primary/5 text-gray-600 hover:text-primary h-12"
+              >
+                <PlusCircle className="w-5 h-5 mr-2" />
+                Adicionar novo endereço
+              </Button>
+
+              {/* Formulário para novo endereço ou edição */}
+              {(isNewAddress || selectedAddress) && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-md m-4">
+                    <h3 className="text-lg font-semibold mb-4">
+                      {selectedAddress ? 'Editar Endereço' : 'Novo Endereço'}
+                    </h3>
+                    <form onSubmit={handleAddressSubmit} className="space-y-4">
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="Nome" className="text-gray-700">Nome do endereço</Label>
+                          <Input
+                            id="Nome"
+                            name="Nome"
+                            value={selectedAddress ? selectedAddress.attributes.Nome : newAddress.Nome}
+                            onChange={handleNewAddressChange}
+                            placeholder="Ex: Casa, Trabalho"
+                            className="mt-1"
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="Cep" className="text-gray-700">CEP</Label>
+                            <Input
+                              id="Cep"
+                              name="Cep"
+                              value={selectedAddress ? selectedAddress.attributes.Cep : newAddress.Cep}
+                              onChange={handleNewAddressChange}
+                              className="mt-1"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="Rua" className="text-gray-700">Rua</Label>
+                            <Input
+                              id="Rua"
+                              name="Rua"
+                              value={selectedAddress ? selectedAddress.attributes.Rua : newAddress.Rua}
+                              onChange={handleNewAddressChange}
+                              className="mt-1"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="Bairro" className="text-gray-700">Bairro</Label>
+                            <Input
+                              id="Bairro"
+                              name="Bairro"
+                              value={selectedAddress ? selectedAddress.attributes.Bairro : newAddress.Bairro}
+                              onChange={handleNewAddressChange}
+                              className="mt-1"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="Cidade" className="text-gray-700">Cidade</Label>
+                            <Input
+                              id="Cidade"
+                              name="Cidade"
+                              value={selectedAddress ? selectedAddress.attributes.Cidade : newAddress.Cidade}
+                              onChange={handleNewAddressChange}
+                              className="mt-1"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="Estado" className="text-gray-700">Estado</Label>
+                          <Input
+                            id="Estado"
+                            name="Estado"
+                            value={selectedAddress ? selectedAddress.attributes.Estado : newAddress.Estado}
+                            onChange={handleNewAddressChange}
+                            className="mt-1"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end space-x-2 mt-6">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsNewAddress(false);
+                            setSelectedAddress(null);
+                          }}
+                          className="w-full sm:w-auto"
+                        >
+                          Cancelar
+                        </Button>
+                        <Button 
+                          type="submit"
+                          className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                        >
+                          {selectedAddress ? 'Atualizar' : 'Adicionar'} endereço
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>

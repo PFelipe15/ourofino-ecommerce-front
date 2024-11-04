@@ -35,13 +35,15 @@ const handleFetchError = async (response: Response) => {
 const fetchCustomerByEmail = async (email: string | undefined) => {
 	const HOST = process.env.HOST;
 	const tokenStrapi = process.env.STRAPI_TOKEN;
-	const response = await fetch(`${HOST}/api/customers?filters[email][$eq]=${email}`, {
+	const response = await fetch(`${HOST}/api/customers?filters[email][$eq]=${email}&populate=*`, {
 		method: 'GET',
 		headers: {
 			"Authorization": `Bearer ${tokenStrapi}`,
 		},
 	});
-	await handleFetchError(response);
+
+	 
+ 	await handleFetchError(response);
 	return response.json();
 }
 
@@ -76,6 +78,7 @@ export const getCustomerOrCreate = async (user: userData): Promise<CustomerData>
 export const updateCustomer = async (customerId: string, user: userData): Promise<string> => {
 	const HOST = process.env.HOST;
 	const tokenStrapi = process.env.STRAPI_TOKEN;
+	console.log(`${HOST}/api/customers/${customerId}`);
 	const response = await fetch(`${HOST}/api/customers/${customerId}`, {
 		method: 'PUT',
 		headers: {
@@ -86,5 +89,6 @@ export const updateCustomer = async (customerId: string, user: userData): Promis
 	});
 	await handleFetchError(response);
 	const updatedCustomer = await response.json();
+	console.log(updatedCustomer);
 	return updatedCustomer.data.id;
 }
