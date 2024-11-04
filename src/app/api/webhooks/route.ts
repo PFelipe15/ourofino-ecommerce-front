@@ -83,26 +83,26 @@ export async function POST(request: Request) {
 async function handleUserCreated(userData: any) {
   try {
     // Exemplo: Criar usuário no seu backend/Strapi
-    // const response = await fetch(`${process.env.HOST}/api/customers`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Authorization': `Bearer ${process.env.STRAPI_TOKEN}`,
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({
-    //     data: {
-    //       first_name: userData.first_name || '',
-    //       last_name: userData.last_name || '',
-    //       email: userData.email_addresses[0]?.email_address || '',
-    //       phone: userData.phone_numbers[0]?.phone_number || 'Não informado',
-    //       clerk_id: userData.id, // Armazenar o ID do Clerk para referência
-    //     }
-    //   })
-    // });
+    const response = await fetch(`${process.env.HOST}/api/customers`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.STRAPI_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: {
+          first_name: userData.first_name || '',
+          last_name: userData.last_name || '',
+          email: userData.email_addresses[0]?.email_address || '',
+          phone: userData.phone_numbers[0]?.phone_number || 'Não informado',
+          clerk_id: userData.id, // Armazenar o ID do Clerk para referência
+        }
+      })
+    });
 
-    // if (!response.ok) {
-    //   throw new Error('Erro ao criar usuário no Strapi');
-    // }
+    if (!response.ok) {
+      throw new Error('Erro ao criar usuário no Strapi');
+    }
 
     console.log('Usuário criado com sucesso no Strapi');
   } catch (error) {
