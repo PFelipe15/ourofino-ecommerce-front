@@ -93,7 +93,7 @@ export const UserOrders = ({ onClose }: UserOrdersProps) => {
   const [openOrders, setOpenOrders] = useState<ResponseData[] | []>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasCanceled, setHasCanceled] = useState(false);
-  const [logged, setLogged] = useState(false);
+  const [logged, setLogged] = useState(true);
   const { user } = useUser();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false); // Estado para controlar o diálogo
@@ -101,13 +101,12 @@ export const UserOrders = ({ onClose }: UserOrdersProps) => {
   const fetchOpenOrders = useCallback(async () => {  
     setIsLoading(true);
     try {
-    if (user) {
-        const responseOrders:ResponseData[] = await getOrdersByCustomer(user.emailAddresses[0].emailAddress); 
+      setIsLoading(true)
+        const responseOrders:ResponseData[] = await getOrdersByCustomer(user?.emailAddresses[0]?.emailAddress); 
          setOpenOrders(responseOrders);
-        }
-        else{
-          setLogged(false);
-        }
+       
+       
+       
       } catch (error) {
         console.error('Erro ao buscar pedidos:', error);
       } finally {
@@ -221,7 +220,7 @@ export const UserOrders = ({ onClose }: UserOrdersProps) => {
           </div>
         ) : openOrders.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">Você não tem pedidos em aberto.</p>
+            <p className="text-gray-500">Você não tem pedidos em aberto ou não está logado.</p>
           </div>
         ) : (
           <AnimatePresence>

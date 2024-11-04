@@ -48,9 +48,9 @@ export interface Attributes2 {
   Cidade: string
   Bairro: string
   Estado: string
-  createdAt: string
-  updatedAt: string
-  publishedAt: string
+  createdAt?: string
+  updatedAt?: string
+  publishedAt?: string
 }
 
 export interface Meta {

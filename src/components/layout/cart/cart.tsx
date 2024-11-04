@@ -45,19 +45,14 @@ export const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
     country: 'BR'
   })
   const { user, isSignedIn } = useUser()
-  const [orderConfirmed, setOrderConfirmed] = useState(false)
-  const [showOpenOrders, setShowOpenOrders] = useState(false)
-  const [hasNewOrders, setHasNewOrders] = useState(true)
-  const [cpf, setCpf] = useState('')
+   const [showOpenOrders, setShowOpenOrders] = useState(false)
+   const [cpf, setCpf] = useState('')
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const [userAddress, setUserAddress] = useState<any>(null)
-  const [useSavedAddress, setUseSavedAddress] = useState(false)
-  const [isAddressModified, setIsAddressModified] = useState(false)
-  const [shippingOptions, setShippingOptions] = useState<any[]>([])
+ 
   const [showThankYouMessage, setShowThankYouMessage] = useState(false)
   const [selectedShippingCost, setSelectedShippingCost] = useState<number | null>(null)
-  const [pickupInStore, setPickupInStore] = useState(false)
-  const [pickupDetails, setPickupDetails] = useState({
+   const [pickupDetails, setPickupDetails] = useState({
     name: '',
     document: ''
   })
@@ -144,8 +139,40 @@ useEffect(() => {
   fetchProductsCartShowcase()
    },[])
 
-  // Modifique a função nextStep para incluir uma verificação
+  // Modifique a função nextStep
   const nextStep = () => {
+   
+    if (!isSignedIn && step >= 0) {
+      toast.error(
+        (t) => (
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-medium text-gray-900">Ação não permitida</span>
+            <p className="mt-1 text-sm text-gray-500">Por favor, faça login para continuar com a compra.</p>
+            <SignInButton mode='modal'>
+              <Button 
+                variant="outline" 
+                className="mt-3 flex items-center gap-2 bg-primary text-white hover:bg-primary-dark transition-all duration-300 px-4 py-2 rounded-md font-semibold text-sm"
+                onClick={() => toast.dismiss(t.id)}
+              >
+                <User size={16} /> Entrar
+              </Button>
+            </SignInButton>
+          </div>
+        ),
+        {
+          duration: 5000,
+          style: {
+            background: '#fff',
+            color: '#333',
+            padding: '16px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          },
+          icon: '🔒',
+        }
+      );
+      return;
+    }
     const newStep = Math.min(step + 1, 3)
     setStep(newStep)
   }
@@ -301,7 +328,7 @@ useEffect(() => {
   })
 
   const handleAddToCart = (product: ProductsData, quantity: number, price: number, selectedSize?: string) => {
-    addItem(product, quantity, price, selectedSize);
+    addItem(product, quantity, price, String(product.attributes.largura));
     toast.success(`${product.attributes.name} foi adicionado ao seu carrinho.`, {
       duration: 3000,
       icon: '🛍️',
@@ -349,6 +376,7 @@ useEffect(() => {
     }
 
     if (showOpenOrders) {
+      setStep(0)
       return <UserOrders onClose={() => setShowOpenOrders(false)} />
     }
 
@@ -362,10 +390,11 @@ useEffect(() => {
       case 1:
         return <UserAddress onNext={(method, addressData, shipping) => {
           setDeliveryMethod(method)
+
           setAddress(addressData)
           setShippingOption(shipping)  // Atualize o shippingOption aqui
           nextStep()
-        }} onPrevious={prevStep} />
+        }} onPrevious={prevStep} produtos={items} />
       case 2:
         return <PaymentMethod 
           onNext={(method) => {
@@ -587,9 +616,34 @@ useEffect(() => {
                     </div>
                     <div className="flex justify-between items-center">
                       <Button onClick={onClose} variant="outline">Continuar Comprando</Button>
-                      <Button onClick={() => setStep(1)}>
-                        Finalizar Compra
-                      </Button>
+                      {isSignedIn ? (
+                        <Button onClick={() => setStep(1)}>
+                          Finalizar Compra
+                        </Button>
+                      ) : (
+                        <SignInButton mode='modal'>
+                          <Button 
+                            className="
+                              flex items-center gap-2 
+                              bg-gradient-to-r from-yellow-600 to-yellow-700
+                              hover:from-yellow-700 hover:to-yellow-800
+                              text-white font-semibold
+                              px-6 py-2.5
+                              rounded-lg
+                              shadow-lg hover:shadow-xl
+                              transform hover:-translate-y-0.5
+                              transition-all duration-200
+                              border border-yellow-600
+                            "
+                          >
+                            <User size={16} className="animate-pulse" />
+                            <span className="relative">
+                              Entrar para Comprar
+                              <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-white/40 transform scale-x-0 transition-transform group-hover:scale-x-100"></span>
+                            </span>
+                          </Button>
+                        </SignInButton>
+                      )}
                     </div>
                   </>
                 ) : (

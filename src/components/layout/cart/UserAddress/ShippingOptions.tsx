@@ -4,14 +4,16 @@ import { Loader2, Truck } from 'lucide-react';
 import { cotarFreteCliente } from '@/_actions/MelhorEnvio';
 import { ResponseDataMelhorEnvio } from '../../../../../types/melhor-envio';  
 import Image from 'next/image';
+import { CartItem } from '@/store/useCartStore';
 
 interface ShippingOptionsProps {
   zipCode: string;
   onSelect: (option: ResponseDataMelhorEnvio) => void;
   onBack: () => void;
+  produtos: CartItem[];
 }
 
-export const ShippingOptions: React.FC<ShippingOptionsProps> = ({ zipCode, onSelect, onBack }) => {
+export const ShippingOptions: React.FC<ShippingOptionsProps> = ({ zipCode, onSelect, onBack, produtos }) => {
   const [shippingOptions, setShippingOptions] = useState<ResponseDataMelhorEnvio[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export const ShippingOptions: React.FC<ShippingOptionsProps> = ({ zipCode, onSel
       try {
         setIsLoading(true);
         setError(null);
-        const options = await cotarFreteCliente(zipCode, 1, 20, 20, 20);
+        const options = await cotarFreteCliente(zipCode, produtos);
         // Filtra as opções para remover aquelas com erro
         const validOptions = options.filter(option => !option.error);
         setShippingOptions(validOptions);

@@ -4,40 +4,34 @@ import { MapPin, Truck, Store, Clock, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { SavedAddress } from './SavedAddress';
-import { NewAddress } from './NewAddress';
+import { AddressForm } from './AddressForm';
 import { PickupInStore } from './PickupInStore';
 import { ShippingOptions } from './ShippingOptions';
+import { CartItem } from '@/store/useCartStore';
 
 interface UserAddressProps {
   onNext: (method: string, addressData?: any, shippingOption?: any) => void;
   onPrevious: () => void;
+  produtos: CartItem[];
 }
 
-export const UserAddress: React.FC<UserAddressProps> = ({ onNext, onPrevious }) => {
+export const UserAddress: React.FC<UserAddressProps> = ({ onNext, onPrevious, produtos }) => {
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [addressData, setAddressData] = useState<any>(null);
   const [showShippingOptions, setShowShippingOptions] = useState(false);
 
   const deliveryMethods = [
     {
-      id: 'saved',
-      title: 'Utilizar endereço cadastrado',
+      id: 'Entrega',
+      title: 'Utilizar endereço para entrega',
       icon: MapPin,
-      description: 'Entrega rápida para o endereço já salvo em sua conta',
+      description: 'Entrega rápida para o endereço selecionado',
       estimatedTime: '2-3 dias úteis',
       additionalInfo: 'Ideal para entregas recorrentes'
     },
+
     {
-      id: 'new',
-      title: 'Novo endereço de entrega',
-      icon: Truck,
-      description: 'Cadastre um novo endereço para esta entrega',
-      estimatedTime: '3-5 dias úteis',
-      additionalInfo: 'Perfeito para enviar para um endereço diferente'
-    },
-    {
-      id: 'pickup',
+      id: 'Retirada',
       title: 'Retirar na loja física',
       icon: Store,
       description: 'Retire seu pedido diretamente em nossa loja',
@@ -66,18 +60,17 @@ export const UserAddress: React.FC<UserAddressProps> = ({ onNext, onPrevious }) 
   const renderSelectedMethodComponent = () => {
     if (showShippingOptions) {
       return <ShippingOptions 
-        zipCode={addressData.zipCode} 
+        zipCode={addressData?.attributes?.Cep} 
+        produtos={produtos}
         onSelect={handleShippingOptionSelect} 
         onBack={() => setShowShippingOptions(false)} 
       />;
     }
 
     switch (selectedMethod) {
-      case 'saved':
-        return <SavedAddress onConfirm={handleAddressConfirm} />;
-      case 'new':
-        return <NewAddress onConfirm={handleAddressConfirm} />;
-      case 'pickup':
+      case 'Entrega':
+        return <AddressForm onConfirm={handleAddressConfirm}  />;
+      case 'Retirada':
         return <PickupInStore onConfirm={handlePickupConfirm} />;
       default:
         return null;

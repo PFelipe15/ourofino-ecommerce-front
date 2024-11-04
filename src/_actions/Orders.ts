@@ -45,25 +45,26 @@ export const createItemsOrder = async (items: any, order_id: number) => {
 	const HOST = process.env.HOST;
 	const TOKEN_STRAPI = process.env.STRAPI_TOKEN;
 	try {
-		// Iterar sobre os itens e criar uma requisição para cada um
 		const order_ItemsPromises = items.map(async (item: any) => {
+			const hasVariants = item.attributes.variants_price !== null;
+			
 			const order_ItemsResponse = await fetch(`${HOST}/api/order-items`, {
 				method: 'POST',
 				headers: {
-					"Authorization": `Bearer ${TOKEN_STRAPI}`, // Corrigido para usar TOKEN_STRAPI
+					"Authorization": `Bearer ${TOKEN_STRAPI}`,
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({ 
 					data: {
 						order: {
-							connect: [order_id]  // Usar o ID do pedido recebido
+							connect: [order_id]
 						},
 						product: {
-							connect: [item.id]  // Usar o ID do produto do item
+							connect: [item.id]
 						},
 						subtotal: item.subtotal,
 						quantity: item.quantity,
-						size: item.selectedSize
+						size: hasVariants ? parseInt(item.selectedSize) : null
 					} 
 				})
 			});
@@ -74,12 +75,10 @@ export const createItemsOrder = async (items: any, order_id: number) => {
 				throw new Error(`Erro ao criar item: ${JSON.stringify(errorData)}`);
 			}
 
-			return await order_ItemsResponse.json(); // Retornar os dados do item criado
+			return await order_ItemsResponse.json();
 		});
 
-		// Aguardar todas as promessas serem resolvidas
 		const order_ItemsData = await Promise.all(order_ItemsPromises);
-
 		return order_ItemsData;
 	} catch (error: any) {
 		throw new Error("Erro ao criar pedido: " + error.message);

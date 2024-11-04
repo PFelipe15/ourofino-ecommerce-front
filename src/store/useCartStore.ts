@@ -29,17 +29,22 @@ interface CartStore {
   forceReset: () => void;
 }
 
- 
- 
-
 export const useCartStore = create(
   persist<CartStore>(
     (set, get) => ({
       items: [],
       step: 0,
       addItem: (item, quantity, price, selectedSize) => set((state) => {
+        const hasVariants = item.attributes.variants_price !== null;
+        
         const existingItemIndex = state.items.findIndex(
-          (cartItem) => cartItem.id === item.id && cartItem.selectedSize === selectedSize
+          (cartItem) => {
+            if (hasVariants) {
+              return cartItem.id === item.id && cartItem.selectedSize === selectedSize;
+            } else {
+              return cartItem.id === item.id;
+            }
+          }
         );
 
         let updatedItems;
@@ -53,41 +58,77 @@ export const useCartStore = create(
           const newItem: CartItem = {
             ...item,
             quantity,
-            selectedSize: selectedSize ?? '',
+            selectedSize: hasVariants ? (selectedSize ?? '') : '',
             price: price ?? 0,
             subtotal: (price ?? 0) * quantity,
           };
           updatedItems = [...state.items, newItem];
         }
 
-        // Resetar o step quando um novo item é adicionado
         return { items: updatedItems, step: 0 };
       }),
-      removeItem: (id: number, selectedSize: string) => set((state) => ({
-        items: state.items.filter((item) => !(item.id === id && item.selectedSize === selectedSize)),
-      })),
+      removeItem: (id: number, selectedSize: string) => set((state) => {
+        const itemToRemove = state.items.find(item => item.id === id);
+        const hasVariants = itemToRemove?.attributes.variants_price !== null;
+
+        return {
+          items: state.items.filter((item) => {
+            if (hasVariants) {
+              return !(item.id === id && item.selectedSize === selectedSize);
+            } else {
+              return item.id !== id;
+            }
+          }),
+        };
+      }),
       clearCart: () => set({ items: [] }),
       increaseQuantity: (id: number, selectedSize: string) => set((state) => {
-        const updatedItems = state.items.map((item) =>
-          item.id === id && item.selectedSize === selectedSize
-            ? {
+        const itemToUpdate = state.items.find(item => item.id === id);
+        const hasVariants = itemToUpdate?.attributes.variants_price !== null;
+
+        const updatedItems = state.items.map((item) => {
+          if (hasVariants) {
+            if (item.id === id && item.selectedSize === selectedSize) {
+              return {
                 ...item,
                 quantity: item.quantity + 1,
-                subtotal: (item.price ?? 0) * (item.quantity + 1), // Atualiza o subtotal
-              }
-            : item
-        );
+                subtotal: (item.price ?? 0) * (item.quantity + 1),
+              };
+            }
+          } else {
+            if (item.id === id) {
+              return {
+                ...item,
+                quantity: item.quantity + 1,
+                subtotal: (item.price ?? 0) * (item.quantity + 1),
+              };
+            }
+          }
+          return item;
+        });
         return { items: updatedItems };
       }),
       decreaseQuantity: (id: number, selectedSize: string) => set((state) => {
+        const itemToUpdate = state.items.find(item => item.id === id);
+        const hasVariants = itemToUpdate?.attributes.variants_price !== null;
+
         const updatedItems = state.items.map((item) => {
-          if (item.id === id && item.selectedSize === selectedSize && item.quantity > 1) {
-            const newQuantity = item.quantity - 1;
-            return {
-              ...item,
-              quantity: newQuantity,
-              subtotal: (item.price ?? 0) * newQuantity, // Atualiza o subtotal
-            };
+          if (hasVariants) {
+            if (item.id === id && item.selectedSize === selectedSize && item.quantity > 1) {
+              return {
+                ...item,
+                quantity: item.quantity - 1,
+                subtotal: (item.price ?? 0) * (item.quantity - 1),
+              };
+            }
+          } else {
+            if (item.id === id && item.quantity > 1) {
+              return {
+                ...item,
+                quantity: item.quantity - 1,
+                subtotal: (item.price ?? 0) * (item.quantity - 1),
+              };
+            }
           }
           return item;
         }).filter((item) => item.quantity > 0);
@@ -114,28 +155,65 @@ export const useCartStore = create(
 
         return { items: newItems }
       }),
-      setStep: (step: number) => set({ step }),
-      resetStep: () => {
-         set({ step: 0 });
-      },
+      setStep: (newStep: number) => set((state) => {
+        if (state.step !== newStep) {
+          return { step: newStep }
+        }
+        return state
+      }),
+      resetStep: () => set((state) => {
+        if (state.step !== 0) {
+          return { step: 0 }
+        }
+        return state
+      }),
       resetCart: () => {
-        set({ items: [], step: 0, isOrderCompleted: false }, true)
-        get().clearLocalStorage()
+        const state = get()
+        if (state.items.length > 0 || state.step !== 0 || state.isOrderCompleted) {
+          set({ 
+            items: [], 
+            step: 0, 
+            isOrderCompleted: false 
+          })
+          get().clearLocalStorage()
+        }
       },
       isOrderCompleted: false,
-      setOrderCompleted: (completed) => set({ isOrderCompleted: completed }),
+      setOrderCompleted: (completed: boolean) => set((state) => {
+        if (state.isOrderCompleted !== completed) {
+          return { isOrderCompleted: completed }
+        }
+        return state
+      }),
       clearLocalStorage: () => {
-        localStorage.removeItem('cart-storage')
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('cart-storage')
+        }
       },
       forceReset: () => {
-        set({ items: [], step: 0, isOrderCompleted: false }, true)
-        get().clearLocalStorage()
-        window.location.reload() // Força o recarregamento da página
+        set({ 
+          items: [], 
+          step: 0, 
+          isOrderCompleted: false 
+        })
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('cart-storage')
+          window.location.reload()
+        }
       },
     }),
     {
       name: 'cart-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        if (typeof window !== 'undefined') {
+          return localStorage
+        }
+        return {
+          getItem: () => null,
+          setItem: () => null,
+          removeItem: () => null,
+        }
+      }),
     }
   )
 )

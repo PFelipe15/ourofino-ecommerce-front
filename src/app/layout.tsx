@@ -7,7 +7,7 @@ import {
 const inter = Inter({ subsets: ["latin"] });
 import { ptBR } from "@clerk/localizations";
  import 'react-toastify/dist/ReactToastify.css';
-import Header from "@/components/layout/header";
+import Header from "@/components/layout/header/header";
 import toast, { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
