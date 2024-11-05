@@ -111,7 +111,7 @@ export const UpdateOrder = async (orderId: number, dataUpdate: any) => {
 	}
 };
 
-export const getOrdersByCustomer = async (email: string) => {
+export const getOrdersByCustomer = async (email: string | undefined) => {
 	const HOST = process.env.HOST;
 	const TOKEN_STRAPI = process.env.STRAPI_TOKEN;
 	const orders = await fetch(
